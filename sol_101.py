@@ -42,10 +42,14 @@ class SOL_101:
                 # finding the position of the stiffness matrix position using the node_dof and column
                 node = current_line[self.BIN3:self.BIN4]
                 dof = current_line[self.BIN5:self.BIN6]
-                current_stiffness = current_line[self.BIN6:self.BIN8]
+                current_stiffness = float(current_line[self.BIN6:self.BIN8])
                 current_node_dof = (node,dof)
                 col = node_dof_list.index(current_node_dof)
                 stiffness_matrix[row,col] = current_stiffness
+                try:
+                    stiffness_matrix[col,row] = current_stiffness
+                except:
+                    continue
             current_line = file.readline()
             line_type_indicator = current_line[self.BIN2:self.BIN3]
 
@@ -63,7 +67,7 @@ class SOL_101:
                 # finding the position of the mass matrix position using the node_dof and column
                 node_col = current_line[self.BIN3:self.BIN4]
                 dof_col = current_line[self.BIN5:self.BIN6]
-                current_mass = current_line[self.BIN6:self.BIN8]
+                current_mass = float(current_line[self.BIN6:self.BIN8])
                 current_node_dof_row = (node_row, dof_row)
                 current_node_dof_col = (node_col, dof_col)
                 row = node_dof_list.index(current_node_dof_row)
@@ -82,7 +86,7 @@ class SOL_101:
         while line_type_indicator != "TUG1    ":
             node_row = current_line[self.BIN3:self.BIN4]
             dof_row = current_line[self.BIN5:self.BIN6]
-            current_load = current_line[self.BIN6:self.BIN8]
+            current_load = float(current_line[self.BIN6:self.BIN8])
             current_node_dof_row = (node_row, dof_row)
             row = node_dof_list.index(current_node_dof_row)
             load_vector[row] = current_load
@@ -91,12 +95,11 @@ class SOL_101:
         return [mass_matrix,stiffness_matrix,load_vector]
 
     def getNodalDisplacements(self,K,F):
-        K_inv = np.linalg.inv(K)
-        nodal_displacements = np.matmul(K_inv,F)
+        nodal_displacements = np.linalg.solve(K,F)
         return nodal_displacements
 
 from sol_101 import *
 solver = SOL_101('DMIG.pch')
 [M,K,F] = solver.generateDmigVariables()
-[nodal_displacements] = solver.getNodalDisplacements(K,F)
+nodal_displacements = solver.getNodalDisplacements(K,F)
 print("placeholder")
