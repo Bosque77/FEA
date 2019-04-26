@@ -114,16 +114,16 @@ class SOL_101:
         all_nodes = solver.model.nodes
         for eid, element in sorted(solver.model.elements.items()):
             solver.model.elements
-            if element.type=="CQUADR":
+            if element.type=="CQUAD4":
                 # Getting the original global coordinates of the 4 nodes that correspond to this element
                 element_nodes = element.nodes
-                node_1_id = element_nodes[0]
+                node_1_id = element_nodes[3]
                 node_1_pos_o = all_nodes.get(node_1_id).get_position()
-                node_2_id = element_nodes[1]
+                node_2_id = element_nodes[2]
                 node_2_pos_o = all_nodes.get(node_2_id).get_position()
-                node_3_id = element_nodes[2]
+                node_3_id = element_nodes[1]
                 node_3_pos_o = all_nodes.get(node_3_id).get_position()
-                node_4_id = element_nodes[3]
+                node_4_id = element_nodes[0]
                 node_4_pos_o = all_nodes.get(node_4_id).get_position()
                 # Getting the new global coordinates of the 4 nodes that correspond to the DEFORMED element
                 # by adding the displacements of the deformed nodes to the original nodes
@@ -180,8 +180,8 @@ class SOL_101:
                     node_4_pos_n = node_4_pos_o
 
                 # After getting the old and transformed nodes for each element in the global coordinate system, we need
-                #     to transform the information into the elemental coordinate system
-                H = self.getHomogenousMatrix(node_1_pos_o, node_2_pos_o,node_3_pos_o)
+                #     to transform the information into the elemental coordinate system I THINK THIS FUNCTION WILL NOT WORK FOR A NOT PERFECTLY SQUARE ELEMENT!!!!
+                H = self.getHomogenousMatrix(node_1_pos_o, node_2_pos_o,node_4_pos_o)
 
                 node_1_pos_o = np.append(node_1_pos_o,[1])
                 node_1_transposed_o = np.transpose(node_1_pos_o)
@@ -221,29 +221,39 @@ class SOL_101:
                 x1_o, x2_o, x3_o, x4_o, y1_o, y2_o, y3_o, y4_o = symbols('x1_o x2_o x3_o x4_o y1_o y2_o y3_o y4_o', real=True)
                 # Defining the new node variables used in the shape function (i.e. the golbal node locations after displacement)
                 x1_n, x2_n, x3_n, x4_n, y1_n, y2_n, y3_n, y4_n = symbols('x1_n x2_n x3_n x4_n y1_n y2_n y3_n y4_n', real=True)
+                x, y = symbols('x y', real=True)
                 # Defining the shape functions
-                a = x1_o-x2_o
-                b = y1_o-y4_o
-                N1 = 1/(4*a*b)*(x1_n-x2_o)*(y1_n-y4_o)
-                N2 =-1/(4*a*b)*(x2_n-x1_o)*(y2_n-y3_o)
-                N3 = 1/(4*a*b)*(x3_n-x4_o)*(y3_n-y2_o)
-                N4 =-1/(4*a*b)*(x4_n-x3_o)*(y4_n-y1_o)
+                a = (x1_o-x2_o)/2
+                b = (y1_o-y4_o)/2
+                N1 = 1/(4*a*b)*(x-x2_o)*(y-y4_o)
+                N2 =-1/(4*a*b)*(x-x1_o)*(y-y3_o)
+                N3 = 1/(4*a*b)*(x-x4_o)*(y-y2_o)
+                N4 =-1/(4*a*b)*(x-x3_o)*(y-y1_o)
+
+
+
                 # Taking the derivative of the shape functions
-                N1_dx = diff(N1,x1_n)
-                N1_dy = diff(N1,y1_n)
-                N2_dx = diff(N2,x2_n)
-                N2_dy = diff(N2,y2_n)
-                N3_dx = diff(N3,x3_n)
-                N3_dy = diff(N3,y3_n)
-                N4_dx = diff(N4,x4_n)
-                N4_dy = diff(N4,y4_n)
+                N1_dx = diff(N1,x)
+                N1_dy = diff(N1,y)
+                N2_dx = diff(N2,x)
+                N2_dy = diff(N2,y)
+                N3_dx = diff(N3,x)
+                N3_dy = diff(N3,y)
+                N4_dx = diff(N4,x)
+                N4_dy = diff(N4,y)
 
                 # Forming the strain-displacement matrix
                 B = Matrix([[N1_dx, 0, N2_dx, 0, N3_dx, 0, N4_dx, 0],[ 0, N1_dy, 0, N2_dy, 0, N3_dy, 0, N4_dy],[ N1_dy, N1_dx, N2_dy, N2_dx, N3_dy, N3_dx, N4_dy, N4_dx]])
                 B = B.subs({x1_o:n1_to[0,0], x2_o:n2_to[0,0], x3_o:n3_to[0,0], x4_o:n4_to[0,0], y1_o:n1_to[0,1], y2_o:n2_to[0,1], y3_o:n3_to[0,1], y4_o:n4_to[0,1]})
-                B = B.subs(
-                    {x1_n: n1_tn[0, 0], x2_n: n2_tn[0, 0], x3_n: n3_tn[0, 0], x4_n: n4_tn[0, 0], y1_n: n1_tn[0, 1],
-                     y2_n: n2_tn[0, 1], y3_n: n3_tn[0, 1], y4_n: n4_tn[0, 1]})
+
+                # Solving for the strain at the center of the element
+                a = a.subs(
+                    {x1_o: n1_to[0, 0], x2_o: n2_to[0, 0], x3_o: n3_to[0, 0], x4_o: n4_to[0, 0], y1_o: n1_to[0, 1],
+                     y2_o: n2_to[0, 1], y3_o: n3_to[0, 1], y4_o: n4_to[0, 1]})
+                b = b.subs(
+                    {x1_o: n1_to[0, 0], x2_o: n2_to[0, 0], x3_o: n3_to[0, 0], x4_o: n4_to[0, 0], y1_o: n1_to[0, 1],
+                     y2_o: n2_to[0, 1], y3_o: n3_to[0, 1], y4_o: n4_to[0, 1]})
+                B = B.subs({x: -a, y:-b})
                 B = np.matrix(B)
                 # Finding the nodal displacements in the elemental coordinate system for each node in the element
                 print(n1_to)
@@ -260,13 +270,21 @@ class SOL_101:
                 T4 = (n4_tn-n4_to)
                 u4 = T4[0,0]
                 v4 = T4[0,1]
-                nodal_displacements = np.matrix([u1,v1,u2,v2,u3,v3,u4,v4])
-                nodal_displacements = np.transpose(nodal_displacements)
-                elemental_strain = B*nodal_displacements
+                current_nodal_displacements = np.matrix([u1,v1,u2,v2,u3,v3,u4,v4])
+                current_nodal_displacements = current_nodal_displacements.astype(float)
+                current_nodal_displacements = np.transpose(current_nodal_displacements)
+                B = B.astype(float)
+                elemental_strain = B*current_nodal_displacements
+                # elemental_strain = np.matmul(B,current_nodal_displacements)
                 Ex = elemental_strain[0,0]
+                sigma_x = 29100000*Ex
                 Ey = elemental_strain[1,0]
                 G = elemental_strain[2,0]
+                print(eid)
+                print(elemental_strain)
                 element_strain_list.append(elemental_strain)
+
+
         self.elemental_strain = element_strain_list
         return element_strain_list
 
@@ -297,7 +315,7 @@ class SOL_101:
         return info
 
 from sol_101 import *
-solver = SOL_101('DMIG.pch','plate.bdf')
+solver = SOL_101('./1_Element/DMIG.pch','./1_Element/1.bdf')
 [M,K,F] = solver.getDmigVariables()
 nodal_displacements = solver.getNodalDisplacements(K,F)
 elemental_strain = solver.getElementStrain(nodal_displacements)
