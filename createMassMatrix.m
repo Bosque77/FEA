@@ -1,4 +1,4 @@
-function [K] = createStiffnessMatrix(file_DMIG)
+function [M] = createMassMatrix(file_DMIG)
 %% Temporarily defining global variables
 
 BIN_1 = 1;
@@ -17,39 +17,46 @@ node_dof_list = {};
 %% Main Code Portion 
 
 fileID = fopen(file_DMIG,'r');
-
-%   Forming the stiffness matrix.
-%   This code goes the the KAAX section in the DMIG and formulates the stiffness matrix
-
 line_1 = fgetl(fileID);
 matrix_size = str2double(line_1(BIN_9:end));
-K = zeros(matrix_size,matrix_size); 
+M = zeros(matrix_size,matrix_size); 
 current_line = fgetl(fileID);
 line_type_indicator = current_line(BIN_2:BIN_3-1);
-row_K = 0;
 while ~strcmp(line_type_indicator,'MAAX    ')
     if strcmp(line_type_indicator,'KAAX    ')
         node = str2double(current_line(BIN_5:BIN_6-1));
         dof = str2double(current_line(BIN_7:BIN_8-1));
         node_dof = [node,dof];
         node_dof_list{end+1} = node_dof;
-        row_K = row_K+1;
-    else
-        node = str2double(current_line(BIN_3: BIN_4-1));
-        dof = str2double(current_line(BIN_5:BIN_6-1));
-        current_stiffness = str2double(current_line(BIN_6:BIN_8-1));
-        current_node_dof = [node, dof];
-        col_K = indexStructure(node_dof_list,current_node_dof);
-        K(row_K,col_K) = current_stiffness;
-        try
-            K(col_K,row_K) = current_stiffness;
-        catch
-            continue
-        end
     end
     current_line = fgetl(fileID);
     line_type_indicator = current_line(BIN_2:BIN_3-1);
 end
+
+% Forming the Mass Matrix
+node_row=0;
+dof_row = 0;
+
+while ~strcmp(line_type_indicator,'PAX     ') && ~strcmp(line_type_indicator,'TUG1    ')
+    if strcmp(line_type_indicator,'MAAX    ')
+        node_row = str2double(current_line(BIN_5:BIN_6-1));
+        dof_row = str2double(current_line(BIN_7:BIN_8-1));
+    else
+        node_col = str2double(current_line(BIN_3:BIN_4-1));
+        dof_col = str2double(current_line(BIN_5:BIN_6-1));
+        current_mass = str2double(current_line(BIN_6:BIN_8-1));
+        current_node_dof_row = [node_row, dof_row];
+        current_node_dof_col = [node_col, dof_col];
+        row_M = indexStructure(node_dof_list,current_node_dof_row);
+        col_M = indexStructure(node_dof_list,current_node_dof_col);
+        M(row_M,col_M) = current_mass;        
+    end
+    current_line = fgetl(fileID);
+    line_type_indicator = current_line(BIN_2:BIN_3-1);
+end
+
+
+
 fclose(fileID);
 
 
